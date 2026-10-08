@@ -227,7 +227,7 @@ npm install</code></pre>
 <section id="tools">
   <div class="wrap">
     <h2>Tools</h2>
-    <p class="sub"><!-- tool-count:start -->7<!-- tool-count:end --> tools. This reference is generated from the code, so it always matches the server.</p>
+    <p class="sub"><!-- tool-count:start -->15<!-- tool-count:end --> tools. This reference is generated from the code, so it always matches the server.</p>
 <!-- tools:start -->
 <article class="tool" id="tool-list_drives">
   <header><h3><code>list_drives</code></h3><span class="tag tag-ok">Read only</span></header>
@@ -240,6 +240,7 @@ npm install</code></pre>
     <dt><code>path</code> <span class="type">string</span> <span class="def">required</span></dt><dd>Folder or drive to scan, for example C:\ or C:\Users\me\AppData. Use ~ for the home folder.</dd>
     <dt><code>wait_seconds</code> <span class="type">integer</span> <span class="def">default 30</span></dt><dd>How long to wait for the scan before returning progress. 0 starts the scan and returns immediately.</dd>
     <dt><code>rescan</code> <span class="type">boolean</span> <span class="def">default false</span></dt><dd>Ignore saved results and scan again.</dd>
+    <dt><code>engine</code> <span class="type">string</span> <span class="def">default "auto"</span></dt><dd>Scan engine. auto picks the fastest one that works (robocopy on Windows). Use node to compare or if results look wrong.</dd>
   </dl>
 </article>
 <article class="tool" id="tool-top_folders">
@@ -254,7 +255,7 @@ npm install</code></pre>
 </article>
 <article class="tool" id="tool-top_files">
   <header><h3><code>top_files</code></h3><span class="tag tag-ok">Read only</span></header>
-  <p>List the largest files in a scanned path, optionally filtered by extension, age or minimum size. Only the 2000 largest files of each scan are kept, so small file filters may return fewer rows than asked. Needs a finished scan. Read only.</p>
+  <p>List the largest files in a scanned path, optionally filtered by extension, age or minimum size. Only the 5000 largest files of each scan are kept, so small file filters may return fewer rows than asked. Needs a finished scan. Read only.</p>
   <dl class="params">
     <dt><code>path</code> <span class="type">string</span> <span class="def">optional</span></dt><dd>Limit to files below this folder. Defaults to the most recent scan.</dd>
     <dt><code>limit</code> <span class="type">integer</span> <span class="def">default 25</span></dt><dd>Maximum rows to return.</dd>
@@ -286,6 +287,71 @@ npm install</code></pre>
     <dt><code>dry_run</code> <span class="type">boolean</span> <span class="def">default true</span></dt><dd>When true nothing is moved. Set to false only after the user agreed to this exact list.</dd>
   </dl>
 </article>
+<article class="tool" id="tool-find_dev_artifacts">
+  <header><h3><code>find_dev_artifacts</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>Find folders that projects can rebuild: node_modules, Python virtual environments and caches, Gradle, Next.js and similar build caches. Shows size, how long since each was touched and how to restore it. Needs a finished scan. Read only. To remove one, use move_to_recycle_bin.</p>
+  <dl class="params">
+    <dt><code>path</code> <span class="type">string</span> <span class="def">optional</span></dt><dd>Limit to this folder. Defaults to the most recent scan.</dd>
+    <dt><code>min_size_mb</code> <span class="type">number</span> <span class="def">default 50</span></dt><dd>Hide folders smaller than this many MB.</dd>
+    <dt><code>older_than_days</code> <span class="type">number</span> <span class="def">optional</span></dt><dd>Only folders not modified for at least this many days.</dd>
+    <dt><code>limit</code> <span class="type">integer</span> <span class="def">default 40</span></dt><dd>Maximum rows to return.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-find_folders">
+  <header><h3><code>find_folders</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>Find folders by name anywhere in a scanned path, with sizes. Names are case insensitive and may use * and ? wildcards, for example ["cache*", "temp"]. Needs a finished scan. Read only.</p>
+  <dl class="params">
+    <dt><code>names</code> <span class="type">string[]</span> <span class="def">required</span></dt><dd>Folder names or patterns to look for.</dd>
+    <dt><code>path</code> <span class="type">string</span> <span class="def">optional</span></dt><dd>Limit to this folder. Defaults to the most recent scan.</dd>
+    <dt><code>min_size_mb</code> <span class="type">number</span> <span class="def">default 0</span></dt><dd>Hide folders smaller than this many MB.</dd>
+    <dt><code>older_than_days</code> <span class="type">number</span> <span class="def">optional</span></dt><dd>Only folders not modified for at least this many days.</dd>
+    <dt><code>limit</code> <span class="type">integer</span> <span class="def">default 30</span></dt><dd>Maximum rows to return.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-find_duplicates">
+  <header><h3><code>find_duplicates</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>Find identical large files among the biggest files of a scan. Files are grouped by size, then compared by content hash, so this reads file contents. Needs a finished scan. Stops after about 40 seconds and says so. Read only. Review the groups before removing any copy.</p>
+  <dl class="params">
+    <dt><code>path</code> <span class="type">string</span> <span class="def">optional</span></dt><dd>Limit to this folder. Defaults to the most recent scan.</dd>
+    <dt><code>min_size_mb</code> <span class="type">number</span> <span class="def">default 10</span></dt><dd>Ignore files smaller than this many MB.</dd>
+    <dt><code>limit</code> <span class="type">integer</span> <span class="def">default 20</span></dt><dd>Maximum duplicate groups to return.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-save_snapshot">
+  <header><h3><code>save_snapshot</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>Save the folder sizes of a finished scan to disk so a later scan can be compared against it. Keeps folders of 10 MB or more, four levels deep. Stored in ~/.diskscout/snapshots. Writes one small file, never touches your data.</p>
+  <dl class="params">
+    <dt><code>path</code> <span class="type">string</span> <span class="def">optional</span></dt><dd>Scanned folder to snapshot. Defaults to the most recent scan.</dd>
+    <dt><code>name</code> <span class="type">string</span> <span class="def">optional</span></dt><dd>Name for the snapshot. Defaults to the folder and the date.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-compare_snapshot">
+  <header><h3><code>compare_snapshot</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>Show which folders grew or shrank since a saved snapshot. Needs a fresh finished scan that covers the snapshot's folder. Call without a name to list saved snapshots. Read only.</p>
+  <dl class="params">
+    <dt><code>name</code> <span class="type">string</span> <span class="def">optional</span></dt><dd>Snapshot name. Leave out to list snapshots.</dd>
+    <dt><code>min_change_mb</code> <span class="type">number</span> <span class="def">default 50</span></dt><dd>Hide changes smaller than this many MB.</dd>
+    <dt><code>limit</code> <span class="type">integer</span> <span class="def">default 20</span></dt><dd>Maximum rows per direction.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-recycle_bin_info">
+  <header><h3><code>recycle_bin_info</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>Show how many items are in the Windows Recycle Bin and roughly how much space they use. Windows only. Read only.</p>
+</article>
+<article class="tool" id="tool-empty_recycle_bin">
+  <header><h3><code>empty_recycle_bin</code></h3><span class="tag tag-warn">Changes files</span></header>
+  <p>Permanently empty the Windows Recycle Bin on all drives. Items cannot be recovered afterwards. Windows only. Defaults to a dry run that only reports what is in it. Set dry_run to false only after the user agreed.</p>
+  <dl class="params">
+    <dt><code>dry_run</code> <span class="type">boolean</span> <span class="def">default true</span></dt><dd>When true nothing is deleted.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-scan_status">
+  <header><h3><code>scan_status</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>List the scans held in memory with their progress, speed and age. Optionally cancel a running scan. Read only apart from cancelling.</p>
+  <dl class="params">
+    <dt><code>cancel_path</code> <span class="type">string</span> <span class="def">optional</span></dt><dd>Root path of a running scan to cancel.</dd>
+  </dl>
+</article>
 <!-- tools:end -->
   </div>
 </section>
@@ -303,6 +369,8 @@ npm install</code></pre>
         <tr><td>Permanent deletion is narrow</td><td><code>clear_cleanup_target</code> only accepts built in ids for temp folders and caches, and keeps the folders. Downloads and system files are never clearable.</td></tr>
         <tr><td>No surprises from links</td><td>Symlinks and junctions are skipped, never followed.</td></tr>
         <tr><td>Everything is logged</td><td>Real changes are appended to <code>~/.diskscout/actions.log</code>.</td></tr>
+        <tr><td>Emptying the Recycle Bin is deliberate</td><td><code>empty_recycle_bin</code> is permanent, so it defaults to a dry run and needs <code>dry_run: false</code>.</td></tr>
+        <tr><td>Files are only read to find duplicates</td><td>Only <code>find_duplicates</code> opens files, to hash them. Everything else uses names, sizes and dates.</td></tr>
       </tbody>
     </table>
   </div>
@@ -315,8 +383,9 @@ npm install</code></pre>
     <details><summary>Why does a OneDrive folder look huge?</summary><p>Online only files report their full size but take almost no local space. Scans use logical file sizes, so cloud placeholders can inflate a folder compared with space actually used on disk.</p></details>
     <details><summary>Why are some items listed as unreadable?</summary><p>The scan runs with your user permissions. Protected system folders are counted as unreadable and their size is not included. Run your MCP client as administrator if you need them.</p></details>
     <details><summary>Does moving files to the Recycle Bin free space?</summary><p>Only after you empty it. Windows may also delete items larger than the bin's limit permanently, so the dry run shows sizes first.</p></details>
-    <details><summary>Does it read my files?</summary><p>No. It reads names, sizes and modified dates only.</p></details>
-    <details><summary>How long does a full drive scan take?</summary><p>It depends on file count and disk speed. A few minutes for a large drive is normal. The scan runs in the background and reports progress, so your assistant can wait and check back.</p></details>
+    <details><summary>Does it read my files?</summary><p>Only the duplicate finder opens files, to compare their contents. Everything else uses names, sizes and modified dates.</p></details>
+    <details><summary>How fast is a full drive scan?</summary><p>On Windows it uses robocopy in list mode, which reads sizes from directory listings without opening files, split across folders and run in parallel. It falls back to a standard engine if anything looks wrong. Each scan reports its engine and files per second. The scan runs in the background and reports progress, so your assistant can wait and check back.</p></details>
+    <details><summary>Why is the folder count sometimes a little different between engines?</summary><p>The fast Windows engine does not list empty folders. File counts and sizes match the standard engine.</p></details>
   </div>
 </section>
 </main>

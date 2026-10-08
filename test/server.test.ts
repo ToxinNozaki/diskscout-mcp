@@ -33,7 +33,8 @@ after(async () => {
 test("lists all tools with annotations", async () => {
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name).sort();
-  assert.deepEqual(names, ["cleanup_candidates", "clear_cleanup_target", "list_drives", "move_to_recycle_bin", "scan_folder", "top_files", "top_folders"]);
+  assert.equal(names.length, 15);
+  for (const n of ["scan_folder", "top_folders", "top_files", "find_duplicates", "find_dev_artifacts", "find_folders", "save_snapshot", "compare_snapshot", "recycle_bin_info", "empty_recycle_bin", "scan_status", "cleanup_candidates", "clear_cleanup_target", "move_to_recycle_bin", "list_drives"]) assert.ok(names.includes(n), `missing ${n}`);
   const rb = tools.find((t) => t.name === "move_to_recycle_bin")!;
   assert.equal(rb.annotations?.destructiveHint, true);
   assert.equal(tools.find((t) => t.name === "top_folders")!.annotations?.readOnlyHint, true);

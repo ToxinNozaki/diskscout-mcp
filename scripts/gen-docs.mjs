@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { z } from "zod";
 import { tools } from "../dist/src/tools.js";
+import { TOP_FILES_LIMIT } from "../dist/src/scanner.js";
 
 const check = process.argv.includes("--check");
 
@@ -72,7 +73,9 @@ const jobs = [
   ["README.md", "tool-count", String(tools.length)],
   ["docs/index.html", "tools", html()],
   ["docs/index.html", "tool-count", String(tools.length)],
+  ["README.md", "top-files", String(TOP_FILES_LIMIT)],
 ];
+const INLINE = new Set(["tool-count", "top-files"]);
 
 let drift = false;
 const files = new Map();
@@ -80,7 +83,7 @@ for (const [file, marker, content] of jobs) {
   const current = files.get(file) ?? readFileSync(file, "utf8");
   const re = new RegExp(`(<!-- ${marker}:start -->)[\\s\\S]*?(<!-- ${marker}:end -->)`);
   if (!re.test(current)) throw new Error(`Marker ${marker} not found in ${file}`);
-  const inline = marker === "tool-count";
+  const inline = INLINE.has(marker);
   const next = current.replace(re, (_, a, b) => (inline ? `${a}${content}${b}` : `${a}\n${content}\n${b}`));
   files.set(file, next);
 }

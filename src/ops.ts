@@ -140,3 +140,15 @@ export async function clearTarget(target: CleanupTarget, dryRun: boolean): Promi
   await audit({ action: "clear_target", target: target.id, paths: target.paths, freedBytes: freed, itemsRemoved, itemsFailed });
   return { targetId: target.id, dryRun, before, after, freed, itemsRemoved, itemsFailed, skipped };
 }
+
+/** Run a PowerShell script. Values travel in environment variables, never in the script text. */
+export function runPowerShell(script: string, env: Record<string, string> = {}, timeoutMs = 60000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+      { env: { ...process.env, ...env }, timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
+      (err, stdout, stderr) => (err ? reject(new Error(stderr?.trim() || err.message)) : resolve(stdout.trim()))
+    );
+  });
+}

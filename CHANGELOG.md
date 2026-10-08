@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+Speed and eight new tools.
+
+- Much faster scanning. New Windows engine based on robocopy list mode, run in parallel across folders, with a built in self test and automatic fallback. The standard engine was rewritten around a callback work queue and a larger thread pool.
+- Scans now report their engine and files per second. `scan_folder` gained an `engine` option (`auto`, `node`, `robocopy`).
+- New tools: `find_dev_artifacts`, `find_folders`, `find_duplicates`, `save_snapshot`, `compare_snapshot`, `recycle_bin_info`, `empty_recycle_bin`, `scan_status`.
+- Each scan now keeps the 5000 largest files (was 2000).
+- Tests for the new tools and a parser test for robocopy output.
+
 ## 0.1.0
 
 First release.

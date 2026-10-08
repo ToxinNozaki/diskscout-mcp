@@ -3,53 +3,15 @@ import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 import { formatBytes, mb, pct } from "./format.js";
-import { ScanJob, ScanRegistry, findNode, isWithin, measureDir, type DirNode } from "./scanner.js";
+import { ScanJob, TOP_FILES_LIMIT, findNode, isWithin, measureDir, type DirNode } from "./scanner.js";
 import { buildTargets } from "./targets.js";
 import { audit, clearTarget, guardEnv, sendToRecycleBin } from "./ops.js";
 import { checkPathAllowed } from "./guard.js";
+import { extraTools } from "./extra-tools.js";
+import { fail, ok, noScanMessage, registry, resolveInput, sleep, type ToolDef } from "./shared.js";
 
-export const registry = new ScanRegistry();
-
-export interface ToolResult {
-  [key: string]: unknown;
-  content: Array<{ type: "text"; text: string }>;
-  structuredContent?: Record<string, unknown>;
-  isError?: boolean;
-}
-
-export interface ToolDef {
-  name: string;
-  title: string;
-  description: string;
-  inputSchema: z.ZodRawShape;
-  readOnly: boolean;
-  destructive: boolean;
-  handler: (args: any) => Promise<ToolResult>;
-}
-
-const ok = (text: string, data?: Record<string, unknown>): ToolResult => ({
-  content: [{ type: "text", text }],
-  ...(data ? { structuredContent: data } : {}),
-});
-const fail = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function resolveInput(p: string): string {
-  let expanded = p.trim();
-  if (expanded === "~" || expanded.startsWith("~/") || expanded.startsWith("~\\")) expanded = path.join(os.homedir(), expanded.slice(1));
-  // "C:" alone means the current folder on that drive in Windows. Treat it as the drive root.
-  if (/^[a-zA-Z]:$/.test(expanded)) expanded += path.sep;
-  return path.resolve(expanded);
-}
-
-function noScanMessage(abs: string): ToolResult {
-  const running = registry.list().find((j) => j.status === "running" && isWithin(j.root, abs));
-  if (running) {
-    return fail(`A scan of ${running.root} is still running (${running.filesSeen.toLocaleString()} files so far). Call scan_folder with that path to wait for it, then try again.`);
-  }
-  return fail(`No finished scan covers ${abs}. Call scan_folder with this path (or a parent folder) first.`);
-}
+export { registry };
+export type { ToolDef, ToolResult } from "./shared.js";
 
 function summarize(job: ScanJob) {
   return {
@@ -61,6 +23,9 @@ function summarize(job: ScanJob) {
     files: job.tree.files,
     folders: job.tree.dirs,
     duration_seconds: Math.round(job.durationMs / 100) / 10,
+    engine: job.engineUsed,
+    files_per_second: job.filesPerSecond,
+    engine_note: job.engineNote,
     unreadable_items: job.errorCount,
     unreadable_samples: job.errorSamples.slice(0, 8),
     skipped_links: job.skippedLinks,
@@ -71,13 +36,14 @@ function summarize(job: ScanJob) {
 function summaryText(job: ScanJob): string {
   const s = summarize(job);
   const lines = [
-    `Scan of ${s.root} finished in ${s.duration_seconds}s.`,
+    `Scan of ${s.root} finished in ${s.duration_seconds}s (${s.files_per_second.toLocaleString()} files per second, ${s.engine} engine).`,
     `Total: ${s.total} in ${s.files.toLocaleString()} files and ${s.folders.toLocaleString()} folders.`,
     `Biggest file types: ${s.top_extensions.slice(0, 6).map((e) => `${e.ext} ${e.size}`).join(", ") || "none"}.`,
   ];
   if (s.unreadable_items) {
     lines.push(`${s.unreadable_items.toLocaleString()} items could not be read (usually permissions). Their size is not counted. Examples: ${s.unreadable_samples.slice(0, 3).join("; ")}`);
   }
+  if (s.engine_note) lines.push(s.engine_note);
   if (s.skipped_links) lines.push(`${s.skipped_links.toLocaleString()} links and junctions were skipped to avoid double counting.`);
   lines.push("Next: top_folders to see where the space is, top_files for single large files.");
   return lines.join("\n");
@@ -103,7 +69,7 @@ async function drives() {
   return out;
 }
 
-export const tools: ToolDef[] = [
+const baseTools: ToolDef[] = [
   {
     name: "list_drives",
     title: "List drives",
@@ -128,10 +94,11 @@ export const tools: ToolDef[] = [
       path: z.string().describe("Folder or drive to scan, for example C:\\ or C:\\Users\\me\\AppData. Use ~ for the home folder."),
       wait_seconds: z.number().int().min(0).max(50).default(30).describe("How long to wait for the scan before returning progress. 0 starts the scan and returns immediately."),
       rescan: z.boolean().default(false).describe("Ignore saved results and scan again."),
+      engine: z.enum(["auto", "node", "robocopy"]).default("auto").describe("Scan engine. auto picks the fastest one that works (robocopy on Windows). Use node to compare or if results look wrong."),
     },
     readOnly: true,
     destructive: false,
-    handler: async ({ path: p, wait_seconds, rescan }) => {
+    handler: async ({ path: p, wait_seconds, rescan, engine }) => {
       const abs = resolveInput(p);
       try {
         const st = await fs.stat(abs);
@@ -152,7 +119,7 @@ export const tools: ToolDef[] = [
 
       let job = registry.findRunning(abs);
       if (!job) {
-        job = new ScanJob(abs);
+        job = new ScanJob(abs, { engine });
         registry.add(job);
       }
       const deadline = Date.now() + wait_seconds * 1000;
@@ -161,7 +128,7 @@ export const tools: ToolDef[] = [
       }
       if (job.status === "error") return fail(`Scan failed: ${job.error}`);
       if (job.status === "running") {
-        const progress = { scan_id: job.id, root: job.root, status: "running", files_seen: job.filesSeen, folders_seen: job.dirsSeen, bytes_seen: job.bytesSeen, seen: formatBytes(job.bytesSeen), elapsed_seconds: Math.round(job.durationMs / 1000), current_path: job.currentPath };
+        const progress = { scan_id: job.id, root: job.root, status: "running", engine: job.engineUsed, files_seen: job.filesSeen, folders_seen: job.dirsSeen, bytes_seen: job.bytesSeen, seen: formatBytes(job.bytesSeen), elapsed_seconds: Math.round(job.durationMs / 1000), current_path: job.currentPath };
         return ok(`Still scanning ${job.root}: ${job.filesSeen.toLocaleString()} files, ${formatBytes(job.bytesSeen)} so far after ${progress.elapsed_seconds}s. Call scan_folder again with the same path to keep waiting.`, progress);
       }
       return ok(summaryText(job), summarize(job));
@@ -207,7 +174,7 @@ export const tools: ToolDef[] = [
     name: "top_files",
     title: "Biggest files",
     description:
-      "List the largest files in a scanned path, optionally filtered by extension, age or minimum size. Only the 2000 largest files of each scan are kept, so small file filters may return fewer rows than asked. Needs a finished scan. Read only.",
+      `List the largest files in a scanned path, optionally filtered by extension, age or minimum size. Only the ${TOP_FILES_LIMIT} largest files of each scan are kept, so small file filters may return fewer rows than asked. Needs a finished scan. Read only.`,
     inputSchema: {
       path: z.string().optional().describe("Limit to files below this folder. Defaults to the most recent scan."),
       limit: z.number().int().min(1).max(200).default(25).describe("Maximum rows to return."),
@@ -236,7 +203,7 @@ export const tools: ToolDef[] = [
         .filter((f) => isWithin(abs, f.path) && f.size >= minBytes && (!exts || exts.includes(path.extname(f.path).toLowerCase())) && f.mtimeMs <= cutoff)
         .slice(0, limit);
       const data = matches.map((f) => ({ path: f.path, size_bytes: f.size, size: formatBytes(f.size), modified: new Date(f.mtimeMs).toISOString().slice(0, 10), days_since_modified: Math.floor((Date.now() - f.mtimeMs) / 86400000) }));
-      const text = data.length ? data.map((d) => `${d.size.padStart(9)}  ${d.modified}  ${d.path}`).join("\n") : "No files match. Only the 2000 largest files of the scan are searched.";
+      const text = data.length ? data.map((d) => `${d.size.padStart(9)}  ${d.modified}  ${d.path}`).join("\n") : `No files match. Only the ${TOP_FILES_LIMIT} largest files of the scan are searched.`;
       return ok(text, { path: abs, files: data });
     },
   },
@@ -366,3 +333,5 @@ export const tools: ToolDef[] = [
     },
   },
 ];
+
+export const tools: ToolDef[] = [...baseTools, ...extraTools];
