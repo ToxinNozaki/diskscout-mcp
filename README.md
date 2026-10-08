@@ -1,6 +1,6 @@
 # diskscout-mcp
 
-[![CI](https://github.com/OWNER/diskscout-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/diskscout-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/ToxinNozaki/diskscout-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ToxinNozaki/diskscout-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](package.json)
 
@@ -8,7 +8,7 @@
 
 Ask Claude "why is my C drive full?" and get real numbers: which folders are biggest, which single files are huge and untouched for a year, and which caches can be cleared without risk. Works with Claude Desktop, Claude Code and any other MCP client. Windows first, with macOS and Linux supported for scanning.
 
-Site: https://OWNER.github.io/diskscout-mcp
+Site: https://toxinnozaki.github.io/diskscout-mcp
 
 ## Why this exists
 
@@ -35,7 +35,7 @@ It currently exposes <!-- tool-count:start -->7<!-- tool-count:end --> tools, li
 You need [Node.js 22 or newer](https://nodejs.org).
 
 ```bash
-git clone https://github.com/OWNER/diskscout-mcp.git
+git clone https://github.com/ToxinNozaki/diskscout-mcp.git
 cd diskscout-mcp
 npm install        # also builds the server
 npm test           # optional, runs the test suite

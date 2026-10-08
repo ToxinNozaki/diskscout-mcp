@@ -5,7 +5,7 @@ Thanks for helping. The project is small on purpose, so changes should be too.
 ## Setup
 
 ```bash
-git clone https://github.com/OWNER/diskscout-mcp.git
+git clone https://github.com/ToxinNozaki/diskscout-mcp.git
 cd diskscout-mcp
 npm install
 npm test

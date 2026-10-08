@@ -40,5 +40,13 @@
   "devDependencies": {
     "@types/node": "^26.6.4",
     "typescript": "^7.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ToxinNozaki/diskscout-mcp.git"
+  },
+  "homepage": "https://toxinnozaki.github.io/diskscout-mcp/",
+  "bugs": {
+    "url": "https://github.com/ToxinNozaki/diskscout-mcp/issues"
   }
 }
