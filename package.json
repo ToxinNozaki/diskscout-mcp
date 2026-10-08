@@ -1,0 +1,44 @@
+{
+  "name": "diskscout-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that scans your drives, finds what is using space, and helps you clean up safely. Works with Claude and any MCP client.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "diskscout-mcp": "dist/src/index.js"
+  },
+  "main": "dist/src/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "docs": "npm run build && node scripts/gen-docs.mjs",
+    "docs:check": "npm run build && node scripts/gen-docs.mjs --check",
+    "start": "node dist/src/index.js",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "disk-usage",
+    "disk-cleanup",
+    "folder-size",
+    "claude",
+    "windows"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>diskscout-mcp</title>
+<meta name="description" content="An MCP server that lets an AI assistant find what is using your disk space and clean it up safely. Works with Claude Desktop, Claude Code and any MCP client.">
+<meta property="og:title" content="diskscout-mcp">
+<meta property="og:description" content="Find what is eating your disk and clean it up safely, from inside your AI assistant.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f6cbd'/%3E%3Cpath d='M16 6a10 10 0 1 0 10 10H16z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#fbfbfa; --surface:#ffffff; --text:#1b1c1e; --muted:#5b6068; --border:#e4e4e0;
+  --accent:#0f6cbd; --accent-ink:#ffffff; --code-bg:#f3f3f0;
+  --ok-bg:#e6f4ea; --ok-ink:#1e6b34; --warn-bg:#fdf0dc; --warn-ink:#8a4b00;
+  --t1:#cfe3f6; --t2:#d9ead3; --t3:#fce8c8; --t4:#e6dcf3; --t5:#f6d7d7; --t6:#dfe3e8; --tink:#1b1c1e;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121315; --surface:#1a1b1e; --text:#ececea; --muted:#9aa0a8; --border:#2c2e33;
+    --accent:#5aa9ee; --accent-ink:#0b1b2b; --code-bg:#202226;
+    --ok-bg:#16301f; --ok-ink:#8fd6a4; --warn-bg:#3a2a12; --warn-ink:#f1c27d;
+    --t1:#1f3a56; --t2:#24402a; --t3:#4a3516; --t4:#35294a; --t5:#4a2424; --t6:#2b2f36; --tink:#ececea;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121315; --surface:#1a1b1e; --text:#ececea; --muted:#9aa0a8; --border:#2c2e33;
+  --accent:#5aa9ee; --accent-ink:#0b1b2b; --code-bg:#202226;
+  --ok-bg:#16301f; --ok-ink:#8fd6a4; --warn-bg:#3a2a12; --warn-ink:#f1c27d;
+  --t1:#1f3a56; --t2:#24402a; --t3:#4a3516; --t4:#35294a; --t5:#4a2424; --t6:#2b2f36; --tink:#ececea;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace}
+code{background:var(--code-bg);padding:.1em .38em;border-radius:5px;font-size:.88em}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;overflow:auto;font-size:.86rem;line-height:1.55;margin:0}
+pre code{background:none;padding:0;font-size:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+header.site{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+header.site .wrap{display:flex;align-items:center;gap:20px;height:56px}
+.brand{font-weight:650;color:var(--text);display:flex;align-items:center;gap:9px;letter-spacing:-.01em}
+.brand svg{width:20px;height:20px}
+nav.main{margin-left:auto;display:flex;gap:20px;font-size:.92rem}
+nav.main a{color:var(--muted)}
+nav.main a:hover{color:var(--text);text-decoration:none}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:8px;font-weight:600;font-size:.95rem;border:1px solid var(--border);color:var(--text);background:var(--surface)}
+.btn:hover{text-decoration:none;border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.hero{padding-top:72px;padding-bottom:48px}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:48px;align-items:center}
+.eyebrow{font-size:.82rem;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px}
+h1{font-size:clamp(2rem,4.4vw,3.1rem);line-height:1.1;letter-spacing:-.025em;margin:0 0 16px;font-weight:700}
+.lead{font-size:1.1rem;color:var(--muted);max-width:34em;margin:0 0 26px}
+.cta{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px}
+.install-line{display:flex;align-items:center;gap:10px;background:var(--code-bg);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:.84rem;max-width:30em}
+.install-line code{background:none;padding:0;flex:1;overflow:auto;white-space:nowrap}
+.copy{border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:6px;padding:3px 9px;font-size:.78rem;cursor:pointer;font-family:inherit}
+.copy:hover{color:var(--text);border-color:var(--muted)}
+.treemap{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(6,58px);gap:4px;border:1px solid var(--border);border-radius:12px;padding:6px;background:var(--surface)}
+.treemap div{border-radius:6px;padding:7px 9px;font-size:.74rem;line-height:1.25;color:var(--tink);overflow:hidden;display:flex;flex-direction:column;justify-content:space-between}
+.treemap b{font-weight:600}
+.treemap span{opacity:.72}
+.tm1{grid-column:1/4;grid-row:1/5;background:var(--t1)}
+.tm2{grid-column:4/7;grid-row:1/3;background:var(--t2)}
+.tm3{grid-column:4/6;grid-row:3/5;background:var(--t3)}
+.tm4{grid-column:6/7;grid-row:3/5;background:var(--t4)}
+.tm5{grid-column:1/3;grid-row:5/7;background:var(--t5)}
+.tm6{grid-column:3/5;grid-row:5/7;background:var(--t6)}
+.tm7{grid-column:5/7;grid-row:5/7;background:var(--t2)}
+.caption{font-size:.78rem;color:var(--muted);margin:8px 2px 0}
+section{padding:56px 0;border-top:1px solid var(--border)}
+h2{font-size:1.65rem;letter-spacing:-.02em;margin:0 0 8px}
+.sub{color:var(--muted);margin:0 0 28px;max-width:40em}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card h3{margin:0 0 6px;font-size:1.02rem}
+.card p{margin:0;color:var(--muted);font-size:.94rem}
+.chat{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;max-width:760px}
+.chat .row{padding:16px 20px;border-bottom:1px solid var(--border)}
+.chat .row:last-child{border-bottom:0}
+.chat .who{font-size:.76rem;font-weight:650;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.chat .calls{font-size:.82rem;color:var(--muted);margin-top:8px}
+.steps{display:grid;gap:18px}
+.step{display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px}
+.num{width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:.9rem}
+.step h3{margin:2px 0 8px;font-size:1.02rem}
+.tabs{display:grid;gap:14px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.tabs h4{margin:0 0 8px;font-size:.9rem}
+.tool{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:14px}
+.tool header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tool h3{margin:0;font-size:1.05rem}
+.tool h3 code{background:none;padding:0;font-size:1.05rem}
+.tool p{margin:8px 0 12px;color:var(--muted);font-size:.95rem}
+.tag{font-size:.72rem;font-weight:650;padding:2px 9px;border-radius:99px}
+.tag-ok{background:var(--ok-bg);color:var(--ok-ink)}
+.tag-warn{background:var(--warn-bg);color:var(--warn-ink)}
+dl.params{margin:0;display:grid;grid-template-columns:minmax(0,15em) minmax(0,1fr);gap:6px 18px;font-size:.88rem;border-top:1px solid var(--border);padding-top:12px}
+dl.params dt{font-weight:500}
+dl.params dd{margin:0;color:var(--muted)}
+.type,.def{font-size:.76rem;color:var(--muted);font-family:ui-monospace,Consolas,monospace}
+.def{display:block}
+table{width:100%;border-collapse:collapse;font-size:.93rem;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--code-bg)}
+tr:last-child td{border-bottom:0}
+details{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:10px}
+summary{cursor:pointer;font-weight:600}
+details p{margin:10px 0 0;color:var(--muted)}
+footer{border-top:1px solid var(--border);padding:32px 0 48px;color:var(--muted);font-size:.9rem}
+footer .wrap{display:flex;flex-wrap:wrap;gap:12px 28px;justify-content:space-between}
+@media (max-width:820px){
+  .hero-grid,.tabs{grid-template-columns:minmax(0,1fr)}
+  .grid3{grid-template-columns:minmax(0,1fr)}
+  nav.main a:not(.gh){display:none}
+  dl.params{grid-template-columns:minmax(0,1fr);gap:2px}
+  dl.params dd{margin-bottom:8px}
+  .hero{padding-top:40px}
+}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#0f6cbd"/><path d="M16 6a10 10 0 1 0 10 10H16z" fill="#fff"/></svg>diskscout-mcp</a>
+    <nav class="main">
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a href="#tools">Tools</a>
+      <a href="#safety">Safety</a>
+      <a href="#faq">FAQ</a>
+      <a class="gh" href="https://github.com/OWNER/diskscout-mcp">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+<div class="wrap hero">
+  <div class="hero-grid">
+    <div>
+      <div class="eyebrow">MCP server for disk cleanup</div>
+      <h1>Find out what is filling your drive, and fix it.</h1>
+      <p class="lead">diskscout-mcp lets your AI assistant scan drives, rank the biggest folders and files, and clear safe-to-delete caches. You approve every change.</p>
+      <div class="cta">
+        <a class="btn primary" href="#install">Install</a>
+        <a class="btn" href="https://github.com/OWNER/diskscout-mcp">View on GitHub</a>
+      </div>
+      <div class="install-line"><code id="cmd">git clone https://github.com/OWNER/diskscout-mcp.git &amp;&amp; cd diskscout-mcp &amp;&amp; npm install</code><button class="copy" data-copy-target="cmd" type="button">Copy</button></div>
+    </div>
+    <div>
+      <div class="treemap" role="img" aria-label="Example treemap of a full drive: AppData, Virtual machines, Gradle caches, Downloads, Steam, Node modules and Other">
+        <div class="tm1"><b>AppData</b><span>84 GB</span></div>
+        <div class="tm2"><b>VirtualBox VMs</b><span>61 GB</span></div>
+        <div class="tm3"><b>.gradle</b><span>22 GB</span></div>
+        <div class="tm4"><b>Temp</b><span>9 GB</span></div>
+        <div class="tm5"><b>Downloads</b><span>31 GB</span></div>
+        <div class="tm6"><b>Steam</b><span>26 GB</span></div>
+        <div class="tm7"><b>node_modules</b><span>14 GB</span></div>
+      </div>
+      <p class="caption">Illustrative example of what a scan surfaces. Numbers are made up.</p>
+    </div>
+  </div>
+</div>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="sub">Disk analyzers are built for people to look at. This one is built for an assistant to call, so you can just ask.</p>
+    <div class="grid3">
+      <div class="card"><h3>Scan once, ask anything</h3><p>A parallel scanner measures a folder or whole drive and keeps the result in memory. Follow up questions are instant.</p></div>
+      <div class="card"><h3>Real numbers</h3><p>Biggest folders with their share of the total, biggest files, and filters for file type, age and size. No guessing.</p></div>
+      <div class="card"><h3>Cleanup with guard rails</h3><p>Known cache locations come with risk levels. Every change is a dry run first, and protected locations are refused in code.</p></div>
+    </div>
+    <div style="height:28px"></div>
+    <div class="chat" aria-label="Example conversation">
+      <div class="row"><div class="who">You</div>My C drive is almost full. Find out why and help me fix it.</div>
+      <div class="row"><div class="who">Claude</div>C: is 96% full with 18 GB free. The biggest folders are AppData (84 GB), VirtualBox VMs (61 GB) and .gradle (22 GB). I found 14.2 GB of caches that are safe to clear. Want me to start with the browser and npm caches?
+        <div class="calls mono">list_drives, scan_folder, top_folders, cleanup_candidates</div></div>
+      <div class="row"><div class="who">You</div>Yes, do a dry run first.</div>
+    </div>
+    <p class="caption">Illustrative conversation.</p>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="sub">Requires <a href="https://nodejs.org">Node.js 22 or newer</a>. Windows, macOS and Linux.</p>
+    <div class="steps">
+      <div class="step"><div class="num">1</div><div>
+        <h3>Get the code</h3>
+<pre><code>git clone https://github.com/OWNER/diskscout-mcp.git
+cd diskscout-mcp
+npm install</code></pre>
+        <p class="caption">npm install also builds the server. Run <code>npm test</code> if you want to verify it.</p>
+      </div></div>
+      <div class="step"><div class="num">2</div><div>
+        <h3>Register it with your client</h3>
+        <div class="tabs">
+          <div><h4>Claude Desktop</h4>
+<pre><code>{
+  "mcpServers": {
+    "diskscout": {
+      "command": "node",
+      "args": ["C:\\path\\to\\diskscout-mcp\\dist\\src\\index.js"]
+    }
+  }
+}</code></pre>
+          <p class="caption">Add to <code>%APPDATA%\Claude\claude_desktop_config.json</code> and restart.</p></div>
+          <div><h4>Claude Code</h4>
+<pre><code>claude mcp add diskscout -- node C:\path\to\diskscout-mcp\dist\src\index.js</code></pre>
+          <p class="caption">Other clients: run <code>node dist/src/index.js</code>. It speaks MCP over stdio.</p></div>
+        </div>
+      </div></div>
+      <div class="step"><div class="num">3</div><div>
+        <h3>Ask</h3>
+        <p style="margin:0">Try: <em>"Scan my C drive and tell me what is using the most space."</em></p>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section id="tools">
+  <div class="wrap">
+    <h2>Tools</h2>
+    <p class="sub"><!-- tool-count:start -->7<!-- tool-count:end --> tools. This reference is generated from the code, so it always matches the server.</p>
+<!-- tools:start -->
+<article class="tool" id="tool-list_drives">
+  <header><h3><code>list_drives</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>Show every drive with total, used and free space. Start here to see which drive is filling up.</p>
+</article>
+<article class="tool" id="tool-scan_folder">
+  <header><h3><code>scan_folder</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>Scan a folder or whole drive and remember the result so other tools answer instantly. Large drives can take a few minutes. The call waits up to wait_seconds, then reports progress. Call it again with the same path to keep waiting or to read the result. Read only.</p>
+  <dl class="params">
+    <dt><code>path</code> <span class="type">string</span> <span class="def">required</span></dt><dd>Folder or drive to scan, for example C:\ or C:\Users\me\AppData. Use ~ for the home folder.</dd>
+    <dt><code>wait_seconds</code> <span class="type">integer</span> <span class="def">default 30</span></dt><dd>How long to wait for the scan before returning progress. 0 starts the scan and returns immediately.</dd>
+    <dt><code>rescan</code> <span class="type">boolean</span> <span class="def">default false</span></dt><dd>Ignore saved results and scan again.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-top_folders">
+  <header><h3><code>top_folders</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>List the biggest folders inside a scanned path, largest first, with each folder's share of the total. Needs a finished scan that covers the path. Read only.</p>
+  <dl class="params">
+    <dt><code>path</code> <span class="type">string</span> <span class="def">required</span></dt><dd>Folder to look inside. Must be inside a scanned location.</dd>
+    <dt><code>depth</code> <span class="type">integer</span> <span class="def">default 1</span></dt><dd>How many levels down to include. 1 lists direct sub folders only.</dd>
+    <dt><code>limit</code> <span class="type">integer</span> <span class="def">default 25</span></dt><dd>Maximum rows to return.</dd>
+    <dt><code>min_size_mb</code> <span class="type">number</span> <span class="def">default 0</span></dt><dd>Hide folders smaller than this many MB.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-top_files">
+  <header><h3><code>top_files</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>List the largest files in a scanned path, optionally filtered by extension, age or minimum size. Only the 2000 largest files of each scan are kept, so small file filters may return fewer rows than asked. Needs a finished scan. Read only.</p>
+  <dl class="params">
+    <dt><code>path</code> <span class="type">string</span> <span class="def">optional</span></dt><dd>Limit to files below this folder. Defaults to the most recent scan.</dd>
+    <dt><code>limit</code> <span class="type">integer</span> <span class="def">default 25</span></dt><dd>Maximum rows to return.</dd>
+    <dt><code>extensions</code> <span class="type">string[]</span> <span class="def">optional</span></dt><dd>Only these file types, for example [".iso", ".zip"].</dd>
+    <dt><code>older_than_days</code> <span class="type">number</span> <span class="def">optional</span></dt><dd>Only files not modified for at least this many days.</dd>
+    <dt><code>min_size_mb</code> <span class="type">number</span> <span class="def">default 0</span></dt><dd>Hide files smaller than this many MB.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-cleanup_candidates">
+  <header><h3><code>cleanup_candidates</code></h3><span class="tag tag-ok">Read only</span></header>
+  <p>Measure well known places that are normally safe to clear: temp folders, browser and package manager caches, crash dumps and similar. Each result has a risk level (safe, caution, review, system) and an id. Items marked clearable can be emptied with clear_cleanup_target. Does not need a scan. Read only.</p>
+  <dl class="params">
+    <dt><code>min_size_mb</code> <span class="type">number</span> <span class="def">default 50</span></dt><dd>Hide targets smaller than this many MB.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-clear_cleanup_target">
+  <header><h3><code>clear_cleanup_target</code></h3><span class="tag tag-warn">Changes files</span></header>
+  <p>Permanently delete the contents of one clearable target from cleanup_candidates, for example user-temp or npm-cache. The folders are kept, only what is inside is removed. Files in use are skipped. Defaults to a dry run that only reports what would happen. Only ids from cleanup_candidates are accepted.</p>
+  <dl class="params">
+    <dt><code>id</code> <span class="type">string</span> <span class="def">required</span></dt><dd>Target id from cleanup_candidates, for example user-temp.</dd>
+    <dt><code>dry_run</code> <span class="type">boolean</span> <span class="def">default true</span></dt><dd>When true nothing is deleted. Set to false only after the user agreed.</dd>
+  </dl>
+</article>
+<article class="tool" id="tool-move_to_recycle_bin">
+  <header><h3><code>move_to_recycle_bin</code></h3><span class="tag tag-warn">Changes files</span></header>
+  <p>Send specific files or folders to the Windows Recycle Bin. Windows only. System folders, drive roots and standard user folders are refused. Defaults to a dry run. Space is only freed after the Recycle Bin is emptied, and Windows may delete items larger than the Recycle Bin limit permanently, so check sizes first.</p>
+  <dl class="params">
+    <dt><code>paths</code> <span class="type">string[]</span> <span class="def">required</span></dt><dd>Exact absolute paths of files or folders. No wildcards.</dd>
+    <dt><code>dry_run</code> <span class="type">boolean</span> <span class="def">default true</span></dt><dd>When true nothing is moved. Set to false only after the user agreed to this exact list.</dd>
+  </dl>
+</article>
+<!-- tools:end -->
+  </div>
+</section>
+
+<section id="safety">
+  <div class="wrap">
+    <h2>Safety</h2>
+    <p class="sub">Cleanup is where a tool like this can do harm, so the rules are enforced in code.</p>
+    <table>
+      <thead><tr><th>Guarantee</th><th>How</th></tr></thead>
+      <tbody>
+        <tr><td>Nothing changes by accident</td><td>Both cleanup tools default to a dry run. A real change needs <code>dry_run: false</code>.</td></tr>
+        <tr><td>System locations are untouchable</td><td>Drive roots, Windows, Program Files, the Recycle Bin, your profile folder and the standard user folders are refused, along with any folder that contains one.</td></tr>
+        <tr><td>Your files are recoverable</td><td><code>move_to_recycle_bin</code> never deletes permanently.</td></tr>
+        <tr><td>Permanent deletion is narrow</td><td><code>clear_cleanup_target</code> only accepts built in ids for temp folders and caches, and keeps the folders. Downloads and system files are never clearable.</td></tr>
+        <tr><td>No surprises from links</td><td>Symlinks and junctions are skipped, never followed.</td></tr>
+        <tr><td>Everything is logged</td><td>Real changes are appended to <code>~/.diskscout/actions.log</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>FAQ</h2>
+    <details><summary>Why not just use WinDirStat, WizTree or Folder Size?</summary><p>Use them if you like looking at a screen. This project exists so an assistant can answer "why is my drive full" and run the cleanup with you, without clicking through a GUI. They complement each other.</p></details>
+    <details><summary>Why does a OneDrive folder look huge?</summary><p>Online only files report their full size but take almost no local space. Scans use logical file sizes, so cloud placeholders can inflate a folder compared with space actually used on disk.</p></details>
+    <details><summary>Why are some items listed as unreadable?</summary><p>The scan runs with your user permissions. Protected system folders are counted as unreadable and their size is not included. Run your MCP client as administrator if you need them.</p></details>
+    <details><summary>Does moving files to the Recycle Bin free space?</summary><p>Only after you empty it. Windows may also delete items larger than the bin's limit permanently, so the dry run shows sizes first.</p></details>
+    <details><summary>Does it read my files?</summary><p>No. It reads names, sizes and modified dates only.</p></details>
+    <details><summary>How long does a full drive scan take?</summary><p>It depends on file count and disk speed. A few minutes for a large drive is normal. The scan runs in the background and reports progress, so your assistant can wait and check back.</p></details>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>diskscout-mcp, MIT licensed.</div>
+    <div><a href="https://github.com/OWNER/diskscout-mcp">GitHub</a> &middot; <a href="https://github.com/OWNER/diskscout-mcp/blob/main/CHANGELOG.md">Changelog</a> &middot; <a href="https://github.com/OWNER/diskscout-mcp/blob/main/CONTRIBUTING.md">Contributing</a></div>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll("[data-copy-target]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var el = document.getElementById(btn.getAttribute("data-copy-target"));
+    var text = el ? el.textContent : "";
+    var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    }
+  });
+});
+</script>
+</body>
+</html>
