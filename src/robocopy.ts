@@ -20,15 +20,23 @@ export interface RobocopyFile {
   path: string;
 }
 
-// Example line (tabs collapsed):  1234  2024/05/01 12:00:00  C:\Users\me\file.txt
-const FILE_LINE = /^\s*(\d+)\s+(\d{4})\/(\d{2})\/(\d{2}) (\d{2}):(\d{2}):(\d{2})\s+(\S.*)$/;
+// Robocopy prints a size and a timestamp before the path. Accept either order, because the
+// exact layout differs between Windows versions and options.
+const TS = String.raw`(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2}):(\d{2})`;
+const SIZE_FIRST = new RegExp(String.raw`^\s*(\d+)\s+${TS}\s+(\S.*)$`);
+const TS_FIRST = new RegExp(String.raw`^\s*${TS}\s+(\d+)\s+(\S.*)$`);
 const ERROR_CODE = /\(0x[0-9A-Fa-f]{8}\)/;
 
+function toFile(size: string, y: string, mo: string, d: string, h: string, mi: string, sec: string, p: string): RobocopyFile {
+  return { size: Number(size), mtimeMs: new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(sec)).getTime(), path: p.replace(/\s+$/, "") };
+}
+
 export function parseRobocopyLine(line: string): RobocopyFile | null {
-  const m = FILE_LINE.exec(line);
-  if (!m) return null;
-  const mtimeMs = new Date(Number(m[2]), Number(m[3]) - 1, Number(m[4]), Number(m[5]), Number(m[6]), Number(m[7])).getTime();
-  return { size: Number(m[1]), mtimeMs, path: m[8].replace(/\s+$/, "") };
+  let m = SIZE_FIRST.exec(line);
+  if (m) return toFile(m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]);
+  m = TS_FIRST.exec(line);
+  if (m) return toFile(m[7], m[1], m[2], m[3], m[4], m[5], m[6], m[8]);
+  return null;
 }
 
 export function isRobocopyError(line: string): boolean {
@@ -40,6 +48,8 @@ interface TaskResult {
   spawnError?: string;
   files: number;
   errors: string[];
+  /** First few raw log lines, kept for diagnostics. */
+  sample: string[];
 }
 
 let counter = 0;
@@ -56,10 +66,11 @@ function runTask(src: string, recursive: boolean, tag: string, children: Set<Chi
       if (settled) return;
       settled = true;
       children.delete(child);
-      const result: TaskResult = { code, spawnError, files: 0, errors: [] };
+      const result: TaskResult = { code, spawnError, files: 0, errors: [], sample: [] };
       if (!spawnError) {
         try {
           await readLog(logPath, (line) => {
+            if (result.sample.length < 6 && line.trim()) result.sample.push(line.slice(0, 160));
             const f = parseRobocopyLine(line);
             if (f) {
               result.files++;
@@ -117,7 +128,7 @@ export function robocopyStatus(): Promise<{ ok: boolean; reason?: string }> {
       const found: RobocopyFile[] = [];
       const res = await runTask(dir, true, "selftest", new Set(), (f) => found.push(f));
       if (res.spawnError) return { ok: false, reason: `robocopy not found (${res.spawnError})` };
-      if (found.length !== 1) return { ok: false, reason: `self test saw ${found.length} files instead of 1` };
+      if (found.length !== 1) return { ok: false, reason: `self test saw ${found.length} files instead of 1, exit code ${res.code}, output ${JSON.stringify(res.sample)}` };
       if (found[0].size !== 12345) return { ok: false, reason: `self test size ${found[0].size} instead of 12345` };
       if (found[0].path.toLowerCase() !== name.toLowerCase()) return { ok: false, reason: `self test path mismatch (${found[0].path})` };
       if (Math.abs(Date.now() - found[0].mtimeMs) > 36 * 3600 * 1000) return { ok: false, reason: "self test timestamp mismatch" };
