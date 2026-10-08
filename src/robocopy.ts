@@ -31,7 +31,9 @@ function toFile(size: string, y: string, mo: string, d: string, h: string, mi: s
   return { size: Number(size), mtimeMs: new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(sec)).getTime(), path: p.replace(/\s+$/, "") };
 }
 
-export function parseRobocopyLine(line: string): RobocopyFile | null {
+export function parseRobocopyLine(raw: string): RobocopyFile | null {
+  // The log uses CRLF. A trailing carriage return would stop the dot from matching to the end.
+  const line = raw.replace(/\r+$/, "");
   let m = SIZE_FIRST.exec(line);
   if (m) return toFile(m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]);
   m = TS_FIRST.exec(line);

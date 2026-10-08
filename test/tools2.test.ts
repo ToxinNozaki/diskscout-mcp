@@ -54,6 +54,7 @@ test("robocopy log lines parse, odd names and errors included", () => {
   assert.equal(parseRobocopyLine("2026/10/08 02:12:11 ERROR 5 (0x00000005) Scanning Source Directory C:\\x\\"), null);
   assert.equal(isRobocopyError("2026/10/08 02:12:11 ERROR 5 (0x00000005) Scanning Source Directory C:\\x\\"), true);
   assert.equal(isRobocopyError("      12345\t2024/05/01 12:34:56\tC:\\a.txt"), false);
+  assert.equal(parseRobocopyLine("\t  \t\t   12345 2026/10/08 06:22:59\tC:\\a b\\tést file.bin\r")?.path, "C:\\a b\\tést file.bin");
   assert.equal(parseRobocopyLine(""), null);
 });
 
